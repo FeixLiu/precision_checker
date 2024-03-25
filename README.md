@@ -16,11 +16,11 @@ register_hook(model, path='./tmp_tensors', target_class_names=None, max_saved_te
 - `target_class_names`: A str or a list of str, indicate the name of target layer to be saved. 
   Note that, only the name of the layer should be passed, not the layer itself.
   Warning: the more target layers are given, the more disk capacities will be consumed.
-- `max_saved_tensors`: The maximum number of tensors will be saved.
+- `max_saved_tensors_per_step`: The maximum number of tensors will be saved per micro step.
   The default value is 50. Set to any negative number to save all tensors.
-- `max_saved_grads`: The maximum number of grads will be saved.
+- `max_saved_grads_per_step`: The maximum number of grads will be saved per micro step.
   The default value is 100. Set to any negative number to save all tensors.
-  In general, more grads than tensors should be saved since one layer may contain 
+  In general, more grads than tensors should be saved since one layer may contain
   more than one parameter.
 
 Users should warp their model before the start of training.
@@ -34,8 +34,8 @@ model = register_saving_hook(
   model,
   path='./tmp_tensors',
   target_class_names=['ColumnSequenceParallelLinear', 'RowSequenceParallelLinear', 'LayerNorm'],
-  max_saved_tensors=100,
-  max_saved_grads=200
+  max_saved_tensors_per_step=100,
+  max_saved_grads_per_step=200
 )
 trainer = Trainer(model)
 trainer.train()

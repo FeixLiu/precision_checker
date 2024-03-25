@@ -6,6 +6,8 @@ first_layer_name_of_each_micro_step = None
 micro_step = -1
 tensor_idx = 0
 grad_idx = 0
+tensor_counter = 0
+grad_counter = 0
 tensor_limit = 50
 grad_limit = 100
 should_save_tensor = True
@@ -14,7 +16,7 @@ should_save_grad = True
 
 def _register_backward_hook_impl(path, param):
     def __impl__(grad):
-        global micro_step, grad_idx, grad_limit, should_save_grad
+        global micro_step, grad_idx, grad_limit, should_save_grad, grad_counter
         if should_save_grad:
             if grad.dtype == paddle.bfloat16:
                 tgt = paddle.cast(grad.detach(), paddle.float32)
@@ -26,7 +28,8 @@ def _register_backward_hook_impl(path, param):
                 f'micro_step_{micro_step}.npy',
                 tgt.numpy())
             grad_idx += 1
-            should_save_grad = (grad_idx != grad_limit)
+            grad_counter += 1
+            should_save_grad = (grad_counter != grad_limit)
 
     return __impl__
 
@@ -34,9 +37,14 @@ def _register_backward_hook_impl(path, param):
 def _register_forward_post_hook_impl(path, target_class_names):
     # have to pass target_class_names to this function to increase micro_step
     def __impl__(layer, i, o):
-        global first_layer_name_of_each_micro_step, micro_step, tensor_idx, tensor_limit, should_save_tensor
+        global first_layer_name_of_each_micro_step, micro_step, tensor_idx, tensor_limit
+        global should_save_tensor, should_save_grad,tensor_counter, grad_counter
         if layer.full_name() == first_layer_name_of_each_micro_step:
             micro_step += 1
+            tensor_counter = 0
+            grad_counter = 0
+            should_save_tensor = True
+            should_save_grad = True
         if layer.__class__.__name__ in target_class_names and should_save_tensor:
             if o.dtype == paddle.bfloat16:
                 o = paddle.cast(o.detach(), paddle.float32)
@@ -48,12 +56,18 @@ def _register_forward_post_hook_impl(path, target_class_names):
                 f'layer_name_{layer.full_name()}_micro_step_{micro_step}.npy',
                 o.numpy())
             tensor_idx += 1
-            should_save_tensor = (tensor_idx != tensor_limit)
+            tensor_counter += 1
+            should_save_tensor = (tensor_counter != tensor_limit)
 
     return __impl__
 
 
-def register_saving_hook(model, path='./tmp_tensors', target_class_names=None, max_saved_tensors=50, max_saved_grads=100):
+def register_saving_hook(
+        model,
+        path='./tmp_tensors',
+        target_class_names=None,
+        max_saved_tensors_per_step=50,
+        max_saved_grads_per_step=100):
     """
     Register post forward hook to layers indicated by `target_class_names`.
     All temp tensors of target layers will be saved in `path/tensor`.
@@ -63,12 +77,12 @@ def register_saving_hook(model, path='./tmp_tensors', target_class_names=None, m
     :param target_class_names: A str or a list of str, indicate the name of target layer to be saved.
                                Note that, only the name of the layer should be passed, not the layer itself.
                                Warning: the more target layers are given, the more disk capacities will be consumed.
-    :param max_saved_tensors: The maximum number of tensors will be saved.
-                              The default value is 50. Set to any negative number to save all tensors.
-    :param max_saved_grads: The maximum number of grads will be saved.
-                            The default value is 100. Set to any negative number to save all tensors.
-                            In general, more grads than tensors should be saved since one layer may contain
-                            more than one parameter.
+    :param max_saved_tensors_per_step: The maximum number of tensors will be saved per micro step.
+                                       The default value is 50. Set to any negative number to save all tensors.
+    :param max_saved_grads_per_step: The maximum number of grads will be saved per micro step.
+                                     The default value is 100. Set to any negative number to save all tensors.
+                                     In general, more grads than tensors should be saved since one layer may contain
+                                     more than one parameter.
     :return: The model after registering hook.
     """
     assert isinstance(model, paddle.nn.Layer), "[HOOK] Teh model must be of type paddle.nn.Layer."
@@ -83,14 +97,14 @@ def register_saving_hook(model, path='./tmp_tensors', target_class_names=None, m
         print(f'[HOOK] The path {path} is already exists, will reuse the path to save temp tensors.')
 
     print(f'[HOOK] Registering hook for layers: {target_class_names}.')
-    if max_saved_tensors > 0:
-        print(f'[HOOK] Up to {max_saved_tensors} tensors will be save.')
+    if max_saved_tensors_per_step > 0:
+        print(f'[HOOK] Up to {max_saved_tensors_per_step} tensors will be save.')
     else:
         print(f'[HOOK] All tensors will be saved.')
 
     global first_layer_name_of_each_micro_step, tensor_limit, grad_limit
-    tensor_limit = max_saved_tensors
-    grad_limit = max_saved_grads
+    tensor_limit = max_saved_tensors_per_step
+    grad_limit = max_saved_grads_per_step
 
     os.makedirs(path, exist_ok=True)
     os.makedirs(f'{path}/tensors', exist_ok=True)

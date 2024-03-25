@@ -106,3 +106,12 @@ The rst.csv files contains 11 columns:
 - `varA`: the variance value of tensor under pathA.
 - `varB`: the variance value of tensor under pathA.
 - `varA - varB`: the difference of the variance value between two tensors.
+
+## Step 4: Visualize the result
+This repo also provides a script to visualize one statistic value each time. Users can get the plot by this command:
+
+`python plot_rst.py --rst_path pathA/tensors/compare_rst/rank_0_rst.csv --target_name 'cosine similarity' --values_per_step 10`
+
+Where `rst_path` is the path of the rst.csv, `target_name` is the field to be plotted, `values_per_step` is the
+number of tensors/grads will be saved each micro step. If not provide `values_per_step`, then the dotted line mark the
+end of each micro step won't be shown on the figure.

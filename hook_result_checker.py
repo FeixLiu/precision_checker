@@ -10,6 +10,7 @@ def check(pathA, pathB):
     title = None
     assert os.path.isdir(pathA), f'[Checker] {pathA} is not exist or not a folder.'
     assert os.path.isdir(pathB), f'[Checker] {pathB} is not exist or not a folder.'
+    os.makedirs(f'{pathA}/compare_rst', exist_ok=True)
     for rank_folder in sorted(os.listdir(pathA)):
         print(f'[Checker] Checking for rank {rank_folder}.')
         if os.path.isdir(f'{pathA}/{rank_folder}') and os.path.isdir(f'{pathB}/{rank_folder}'):
@@ -22,46 +23,52 @@ def check(pathA, pathB):
                     print(f'[Checker] Will skip checking tensor {tensor} for rank {rank_folder} '
                           f'since it exists in {pathA} but not exists in {pathB}.')
                     continue
-                a = np.load(f'{pathA}/{rank_folder}/{tensor}').astype(np.float32).flatten()
-                b = np.load(f'{pathB}/{rank_folder}/{tensor}').astype(np.float32).flatten()
+                a = np.load(f'{pathA}/{rank_folder}/{tensor}').astype(np.float128).flatten()
+                b = np.load(f'{pathB}/{rank_folder}/{tensor}').astype(np.float128).flatten()
                 meanA = np.mean(a)
                 meanB = np.mean(b)
                 stdA = np.std(a)
                 stdB = np.std(b)
                 varA = np.var(a)
                 varB = np.var(b)
-                statistic[rank_folder][tensor] = {
-                    'cosine similarity': np.dot(a, b) / (norm(a) * norm(b)),
-                    'meanA': meanA,
-                    'meanB': meanB,
-                    'meanA - meanB': meanA - meanB,
-                    'stdA': stdA,
-                    'stdB': stdB,
-                    'stdA - stdB': stdA - stdB,
-                    'varA': varA,
-                    'varB': varB,
-                    'varA - varB': varA - varB
-                }
+                try:
+                    statistic[rank_folder][tensor] = {
+                        'cosine similarity': np.dot(a, b) / (norm(a) * norm(b)),
+                        'meanA': meanA,
+                        'meanB': meanB,
+                        'meanA - meanB': meanA - meanB,
+                        'stdA': stdA,
+                        'stdB': stdB,
+                        'stdA - stdB': stdA - stdB,
+                        'varA': varA,
+                        'varB': varB,
+                        'varA - varB': varA - varB
+                    }
+                except Exception as e:
+                    print(
+                        f'[Checker] error encountered when parse '
+                        f'{pathA}/{rank_folder}/{tensor} and {pathB}/{rank_folder}/{tensor}, '
+                        f'will exit with {e}'
+                    )
+                    exit(-1)
                 if title is None:
                     title = 'tensor_name'
                     for name in statistic[rank_folder][tensor].keys():
                         title += f',{name}'
                     title += '\n'
 
-    os.makedirs(f'{pathA}/compare_rst', exist_ok=True)
-    for rank in statistic.keys():
-        print(f'[Checker] Saving rst for rank {rank}')
-        results = statistic[rank]
-        tensors = sorted(results.keys(), key=lambda x: int(x.split('_')[2]))
-        with open(f'{pathA}/compare_rst/{rank}_rst.csv', 'w') as file:
-            file.write(title)
-            for tensor in tensors:
-                rst = f'{tensor}'
-                for k, v in results[tensor].items():
-                    rst += f',{v}'
-                rst += '\n'
-                file.write(rst)
-    print(f'[Checker] Checking results have been saved at {pathA}/compare_rst.')
+            # saving the result
+            results = statistic[rank_folder]
+            tensors = sorted(results.keys(), key=lambda x: int(x.split('_')[2]))
+            with open(f'{pathA}/compare_rst/{rank_folder}_rst.csv', 'w') as file:
+                file.write(title)
+                for tensor in tensors:
+                    rst = f'{tensor}'
+                    for k, v in results[tensor].items():
+                        rst += f',{v}'
+                    rst += '\n'
+                    file.write(rst)
+            print(f'[Checker] Checking results have been saved at {pathA}/compare_rst/{rank_folder}_rst.csv .')
 
 
 def main():

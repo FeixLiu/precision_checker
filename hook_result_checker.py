@@ -5,13 +5,9 @@ import argparse
 from tqdm import tqdm
 
 
-statistic = {}
-title = None
-
-
 def check(pathA, pathB):
-    global statistic
-    global title
+    statistic = {}
+    title = None
     assert os.path.isdir(pathA), f'[Checker] {pathA} is not exist or not a folder.'
     assert os.path.isdir(pathB), f'[Checker] {pathB} is not exist or not a folder.'
     for rank_folder in sorted(os.listdir(pathA)):
@@ -76,8 +72,10 @@ def main():
     pathA = args.pathA
     pathB = args.pathB
     assert pathA is not None and pathB is not None, "Should provide --pathA and --pathB"
-    print(f'Comparing {pathA} with {pathB}.')
-    check(pathA, pathB)
+    print(f'[Checker] Comparing {pathA}/tensors with {pathB}/tensors.')
+    check(f'{pathA}/tensors', f'{pathB}/tensors')
+    print(f'[Checker] Comparing {pathA}/grads with {pathB}/grads.')
+    check(f'{pathA}/grads', f'{pathB}/grads')
 
 
 if __name__ == '__main__':
